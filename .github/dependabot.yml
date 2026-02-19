@@ -6,7 +6,6 @@ updates:
     interval: weekly
   open-pull-requests-limit: 10
   labels:
-  - enhancement
   - dependency-management
   groups:
     all-updates:
@@ -18,7 +17,6 @@ updates:
     interval: weekly
   open-pull-requests-limit: 10
   labels:
-  - enhancement
   - dependency-management
   groups:
     all-updates:
@@ -30,7 +28,6 @@ updates:
     interval: weekly
   open-pull-requests-limit: 10
   labels:
-  - enhancement
   - dependency-management
   groups:
     all-updates:
