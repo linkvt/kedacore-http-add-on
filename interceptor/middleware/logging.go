@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-logr/logr"
 
@@ -33,20 +34,17 @@ func (lm *Logging) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r = util.RequestWithLogger(r, lm.logger.WithName("LoggingMiddleware"))
 	w = newResponseWriter(w)
 
-	var sw util.Stopwatch
-	defer lm.logAsync(w, r, &sw)
-
-	sw.Start()
-	defer sw.Stop()
+	startTime := time.Now()
+	defer lm.logAsync(w, r, startTime)
 
 	lm.upstreamHandler.ServeHTTP(w, r)
 }
 
-func (lm *Logging) logAsync(w http.ResponseWriter, r *http.Request, sw *util.Stopwatch) {
-	go lm.log(w, r, sw)
+func (lm *Logging) logAsync(w http.ResponseWriter, r *http.Request, startTime time.Time) {
+	go lm.log(w, r, startTime)
 }
 
-func (lm *Logging) log(w http.ResponseWriter, r *http.Request, sw *util.Stopwatch) {
+func (lm *Logging) log(w http.ResponseWriter, r *http.Request, startTime time.Time) {
 	ctx := r.Context()
 	logger := util.LoggerFromContext(ctx)
 
@@ -55,7 +53,7 @@ func (lm *Logging) log(w http.ResponseWriter, r *http.Request, sw *util.Stopwatc
 		lrw = newResponseWriter(w)
 	}
 
-	timestamp := sw.StartTime().Format(CombinedLogTimeFormat)
+	timestamp := startTime.Format(CombinedLogTimeFormat)
 	log := fmt.Sprintf(
 		CombinedLogFormat,
 		r.RemoteAddr,

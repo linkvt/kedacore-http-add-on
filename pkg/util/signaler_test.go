@@ -25,8 +25,7 @@ var _ = Describe("Signaler", func() {
 		It("produces on channel", func() {
 			s := make(signaler, 1)
 
-			err := WithTimeout(time.Second, DeapplyError(s.Signal, nil))
-			Expect(err).NotTo(HaveOccurred())
+			s.Signal()
 
 			select {
 			case <-s:
@@ -39,19 +38,19 @@ var _ = Describe("Signaler", func() {
 			s := make(signaler, 1)
 			s <- struct{}{}
 
-			err := WithTimeout(time.Second, DeapplyError(s.Signal, nil))
-			Expect(err).NotTo(HaveOccurred())
+			s.Signal()
 		})
 	})
 
 	Context("Wait", func() {
 		It("returns nil when channel is not empty", func() {
-			ctx := context.TODO()
+			ctx, cancel := context.WithTimeout(context.TODO(), time.Second)
+			defer cancel()
 
 			s := make(signaler, 1)
 			s <- struct{}{}
 
-			err := WithTimeout(time.Second, ApplyContext(s.Wait, ctx))
+			err := s.Wait(ctx)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -61,7 +60,7 @@ var _ = Describe("Signaler", func() {
 
 			s := make(signaler, 1)
 
-			err := WithTimeout(time.Second, ApplyContext(s.Wait, ctx))
+			err := s.Wait(ctx)
 			Expect(err).To(MatchError(context.Canceled))
 		})
 	})
@@ -73,19 +72,19 @@ var _ = Describe("Signaler", func() {
 
 			s := NewSignaler()
 
-			err0 := WithTimeout(time.Second, DeapplyError(s.Signal, nil))
-			Expect(err0).NotTo(HaveOccurred())
+			s.Signal()
+			s.Signal()
 
-			err1 := WithTimeout(time.Second, DeapplyError(s.Signal, nil))
-			Expect(err1).NotTo(HaveOccurred())
+			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, time.Second)
+			defer timeoutCancel()
 
-			err2 := WithTimeout(time.Second, ApplyContext(s.Wait, ctx))
-			Expect(err2).NotTo(HaveOccurred())
+			err := s.Wait(timeoutCtx)
+			Expect(err).NotTo(HaveOccurred())
 
 			cancel()
 
-			err3 := WithTimeout(time.Second, ApplyContext(s.Wait, ctx))
-			Expect(err3).To(MatchError(context.Canceled))
+			err = s.Wait(ctx)
+			Expect(err).To(MatchError(context.Canceled))
 		})
 	})
 })
