@@ -73,7 +73,7 @@ func (i *InformerBackedEndpointsCache) Watch(
 	}), nil
 }
 
-func (i *InformerBackedEndpointsCache) addEvtHandler(obj interface{}) {
+func (i *InformerBackedEndpointsCache) addEvtHandler(obj any) {
 	depl, ok := obj.(*discov1.EndpointSlice)
 	if !ok {
 		i.lggr.Error(
@@ -88,7 +88,7 @@ func (i *InformerBackedEndpointsCache) addEvtHandler(obj interface{}) {
 	}
 }
 
-func (i *InformerBackedEndpointsCache) updateEvtHandler(_, newObj interface{}) {
+func (i *InformerBackedEndpointsCache) updateEvtHandler(_, newObj any) {
 	depl, ok := newObj.(*discov1.EndpointSlice)
 	if !ok {
 		i.lggr.Error(
@@ -103,7 +103,7 @@ func (i *InformerBackedEndpointsCache) updateEvtHandler(_, newObj interface{}) {
 	}
 }
 
-func (i *InformerBackedEndpointsCache) deleteEvtHandler(obj interface{}) {
+func (i *InformerBackedEndpointsCache) deleteEvtHandler(obj any) {
 	depl, ok := obj.(*discov1.EndpointSlice)
 	if !ok {
 		i.lggr.Error(

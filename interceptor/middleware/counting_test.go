@@ -115,7 +115,7 @@ func expectUpdates(
 	agg := 0
 	grp.Go(func() error {
 		// we expect the queue to be resized nResizes times
-		for i := 0; i < nResizes; i++ {
+		for i := range nResizes {
 			select {
 			case hostAndCount := <-fakeCounter.ResizedCh:
 				agg += hostAndCount.Count

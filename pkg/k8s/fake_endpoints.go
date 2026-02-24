@@ -15,7 +15,7 @@ import (
 // equal to u.Hostname()
 func FakeEndpointsForURL(u *url.URL, namespace, name string, num int) (*discov1.EndpointSliceList, error) {
 	urls := make([]*url.URL, num)
-	for i := 0; i < num; i++ {
+	for i := range num {
 		urls[i] = u
 	}
 	return FakeEndpointsForURLs(urls, namespace, name)

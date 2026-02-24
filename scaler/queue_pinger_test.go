@@ -98,8 +98,7 @@ func TestCounts(t *testing.T) {
 
 func TestFetchAndSaveCounts(t *testing.T) {
 	r := require.New(t)
-	ctx, done := context.WithCancel(context.Background())
-	defer done()
+	ctx := t.Context()
 	const (
 		ns           = "testns"
 		svcName      = "testsvc"
@@ -163,8 +162,7 @@ func TestFetchAndSaveCounts(t *testing.T) {
 
 func TestFetchCounts(t *testing.T) {
 	r := require.New(t)
-	ctx, done := context.WithCancel(context.Background())
-	defer done()
+	ctx := t.Context()
 	const (
 		ns           = "testns"
 		svcName      = "testsvc"

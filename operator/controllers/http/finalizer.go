@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"slices"
 
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,7 +21,7 @@ func ensureFinalizer(
 	client client.Client,
 	httpso *httpv1alpha1.HTTPScaledObject,
 ) error {
-	if !contains(httpso.GetFinalizers(), httpScaledObjectFinalizer) {
+	if !slices.Contains(httpso.GetFinalizers(), httpScaledObjectFinalizer) {
 		logger.Info("Adding Finalizer for the ScaledObject")
 		httpso.SetFinalizers(append(httpso.GetFinalizers(), httpScaledObjectFinalizer))
 
@@ -44,8 +45,10 @@ func finalizeScaledObject(
 	logger logr.Logger,
 	client client.Client,
 	httpso *httpv1alpha1.HTTPScaledObject) error {
-	if contains(httpso.GetFinalizers(), httpScaledObjectFinalizer) {
-		httpso.SetFinalizers(remove(httpso.GetFinalizers(), httpScaledObjectFinalizer))
+	if slices.Contains(httpso.GetFinalizers(), httpScaledObjectFinalizer) {
+		httpso.SetFinalizers(slices.DeleteFunc(httpso.GetFinalizers(), func(s string) bool {
+			return s == httpScaledObjectFinalizer
+		}))
 		if err := client.Update(ctx, httpso); err != nil {
 			logger.Error(
 				err,
@@ -59,26 +62,4 @@ func finalizeScaledObject(
 
 	logger.Info("Successfully finalized HTTPScaledObject")
 	return nil
-}
-
-// contains checks if the passed string is present in the given slice of strings.
-// This is taken from github.com/kedacore/keda
-func contains(list []string, s string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-	return false
-}
-
-// remove deletes the passed string from the given slice of strings.
-// This is taken from github.com/kedacore/keda
-func remove(list []string, s string) []string {
-	for i, v := range list {
-		if v == s {
-			list = append(list[:i], list[i+1:]...)
-		}
-	}
-	return list
 }

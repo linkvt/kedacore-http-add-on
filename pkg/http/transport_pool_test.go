@@ -49,11 +49,9 @@ func TestTransportPool_ConcurrentAccess(t *testing.T) {
 	transports := make(chan *http.Transport, numGoroutines)
 
 	for range numGoroutines {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			transports <- pool.Get(timeout)
-		}()
+		})
 	}
 
 	wg.Wait()

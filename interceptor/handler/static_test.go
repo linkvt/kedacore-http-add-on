@@ -42,7 +42,7 @@ var _ = Describe("ServeHTTP", func() {
 		var b bool
 		r = r.WithContext(util.ContextWithLogger(r.Context(), funcr.NewJSON(
 			func(obj string) {
-				var m map[string]interface{}
+				var m map[string]any
 
 				err := json.Unmarshal([]byte(obj), &m)
 				Expect(err).NotTo(HaveOccurred())

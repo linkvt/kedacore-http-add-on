@@ -89,9 +89,9 @@ func TestRequestsBucketsSimple(t *testing.T) {
 func TestRequestsBucketsManyReps(t *testing.T) {
 	trunc1 := time.Now().Truncate(granularity)
 	buckets := NewRequestsBuckets(time.Minute*5, granularity)
-	for p := 0; p < 5; p++ {
+	for p := range 5 {
 		trunc1 = trunc1.Add(granularity)
-		for t := 0; t < 5; t++ {
+		for t := range 5 {
 			buckets.Record(trunc1, t+p)
 		}
 	}
@@ -125,9 +125,9 @@ func TestRequestsBucketsManyRepsWithNonMonotonicalOrder(t *testing.T) {
 	buckets := NewRequestsBuckets(time.Minute, granularity)
 
 	d := []int{0, 3, 2, 1, 4}
-	for p := 0; p < 5; p++ {
+	for p := range 5 {
 		end = start.Add(time.Duration(d[p]) * granularity)
-		for t := 0; t < 5; t++ {
+		for t := range 5 {
 			buckets.Record(end, p+t)
 		}
 	}
@@ -338,7 +338,7 @@ func TestRequestsBucketsHoles(t *testing.T) {
 	now := time.Now()
 	buckets := NewRequestsBuckets(5*time.Second, granularity)
 
-	for i := time.Duration(0); i < 5; i++ {
+	for i := range time.Duration(5) {
 		buckets.Record(now.Add(i*time.Second), int(i+1))
 	}
 
@@ -378,7 +378,7 @@ func BenchmarkWindowAverage(b *testing.B) {
 			buckets := NewRequestsBuckets(time.Duration(wl)*time.Second,
 				time.Second /*granularity*/)
 			// Populate with some random data.
-			for i := 0; i < wl; i++ {
+			for i := range wl {
 				buckets.Record(tn.Add(time.Duration(i)*time.Second), rand.Int()*100)
 			}
 			for i := 0; i < b.N; i++ {
@@ -419,7 +419,7 @@ func (t *RequestsBuckets) forEachBucket(now time.Time, acc func(time time.Time, 
 	numBuckets := len(t.buckets) - int(now.Sub(t.lastWrite)/t.granularity)
 	bucketTime := t.lastWrite // Always aligned with granularity.
 	si := t.timeToIndex(bucketTime)
-	for i := 0; i < numBuckets; i++ {
+	for range numBuckets {
 		tIdx := si % len(t.buckets)
 		acc(bucketTime, t.buckets[tIdx])
 		si--

@@ -84,10 +84,7 @@ func (r *Memory) Decrease(host string, delta int) error {
 	}
 
 	// Decrement and clamp concurrency to zero
-	newVal := current - delta
-	if newVal < 0 {
-		newVal = 0
-	}
+	newVal := max(current-delta, 0)
 	r.concurrentMap[host] = newVal
 
 	return nil

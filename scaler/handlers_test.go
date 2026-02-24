@@ -806,10 +806,7 @@ func TestGetMetrics(t *testing.T) {
 		name := fmt.Sprintf("test case %d: %s", i, tc.name)
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			ctx, done := context.WithCancel(
-				context.Background(),
-			)
-			defer done()
+			ctx := t.Context()
 			lggr := logr.Discard()
 			fakeClient, pinger, cleanup, err := tc.setupFn(t, ctx, lggr)
 			r.NoError(err)

@@ -100,7 +100,7 @@ func (f *FakeEndpointsCache) SetEndpoints(ns, name string, num int) error {
 	if err != nil {
 		return fmt.Errorf("no endpoints %s found", name)
 	}
-	for i := 0; i < num; i++ {
+	for range num {
 		endpoint := discov1.Endpoint{
 			Addresses: []string{
 				"1.2.3.4",
