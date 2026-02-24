@@ -3,43 +3,38 @@ package main
 import (
 	"time"
 
-	"github.com/kelseyhightower/envconfig"
+	"github.com/caarlos0/env/v11"
 )
 
 type config struct {
 	// GRPCPort is what port to serve the KEDA-compatible gRPC external scaler interface
 	// on
-	GRPCPort int `envconfig:"KEDA_HTTP_SCALER_PORT" default:"8080"`
+	GRPCPort int `env:"KEDA_HTTP_SCALER_PORT" envDefault:"8080"`
 	// TargetNamespace is the namespace in which this scaler is running, and the namespace
 	// that the target interceptors are running in. This scaler and all the interceptors
 	// must be running in the same namespace
-	TargetNamespace string `envconfig:"KEDA_HTTP_SCALER_TARGET_ADMIN_NAMESPACE" required:"true"`
+	TargetNamespace string `env:"KEDA_HTTP_SCALER_TARGET_ADMIN_NAMESPACE,required"`
 	// TargetService is the name of the service to issue metrics RPC requests to interceptors
-	TargetService string `envconfig:"KEDA_HTTP_SCALER_TARGET_ADMIN_SERVICE" required:"true"`
+	TargetService string `env:"KEDA_HTTP_SCALER_TARGET_ADMIN_SERVICE,required"`
 	// TargetDeployment is the name of the deployment to issue metrics RPC requests to interceptors
-	TargetDeployment string `envconfig:"KEDA_HTTP_SCALER_TARGET_ADMIN_DEPLOYMENT" required:"true"`
+	TargetDeployment string `env:"KEDA_HTTP_SCALER_TARGET_ADMIN_DEPLOYMENT,required"`
 	// TargetPort is the port on TargetService to which to issue metrics RPC requests to
 	// interceptors
-	TargetPort int `envconfig:"KEDA_HTTP_SCALER_TARGET_ADMIN_PORT" required:"true"`
-	// TargetPendingRequests is the default value for the
-	// pending requests value that the scaler will return to
-	// KEDA, if that value is not set on an incoming
-	// `HTTPScaledObject`
-	TargetPendingRequests int `envconfig:"KEDA_HTTP_SCALER_TARGET_PENDING_REQUESTS" default:"100"`
+	TargetPort int `env:"KEDA_HTTP_SCALER_TARGET_ADMIN_PORT,required"`
 	// CacheSyncPeriod is the time interval for the controller-runtime cache to resync.
 	// TODO: consider removing this to use the default value, otherwise align the env var name
-	CacheSyncPeriod time.Duration `envconfig:"KEDA_HTTP_SCALER_CONFIG_MAP_INFORMER_RSYNC_PERIOD" default:"60m"`
+	CacheSyncPeriod time.Duration `env:"KEDA_HTTP_SCALER_CONFIG_MAP_INFORMER_RSYNC_PERIOD" envDefault:"60m"`
 	// DeploymentCacheRsyncPeriod is the time interval
 	// for the deployment informer to rsync the local cache.
-	DeploymentCacheRsyncPeriod time.Duration `envconfig:"KEDA_HTTP_SCALER_DEPLOYMENT_INFORMER_RSYNC_PERIOD" default:"60m"`
+	DeploymentCacheRsyncPeriod time.Duration `env:"KEDA_HTTP_SCALER_DEPLOYMENT_INFORMER_RSYNC_PERIOD" envDefault:"60m"`
 	// QueueTickDuration is the duration between queue requests
-	QueueTickDuration time.Duration `envconfig:"KEDA_HTTP_QUEUE_TICK_DURATION" default:"500ms"`
+	QueueTickDuration time.Duration `env:"KEDA_HTTP_QUEUE_TICK_DURATION" envDefault:"500ms"`
 	// ProfilingAddr if not empty, pprof will be available on this address, assuming host:port here
-	ProfilingAddr string `envconfig:"PROFILING_BIND_ADDRESS" default:""`
+	ProfilingAddr string `env:"PROFILING_BIND_ADDRESS" envDefault:""`
+	// StreamIntervalMS is the interval in milliseconds between stream ticks
+	StreamIntervalMS int `env:"KEDA_HTTP_SCALER_STREAM_INTERVAL_MS" envDefault:"200"`
 }
 
-func mustParseConfig() *config {
-	ret := new(config)
-	envconfig.MustProcess("", ret)
-	return ret
+func mustParseConfig() config {
+	return env.Must(env.ParseAs[config]())
 }

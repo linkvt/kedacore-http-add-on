@@ -267,11 +267,11 @@ func TestStreamIsActive(t *testing.T) {
 			defer ticker.Stop()
 			tc.setup(t, pinger)
 
-			hdl := newImpl(
+			hdl := newScalerHandler(
 				lggr,
 				pinger,
 				fakeClient,
-				123,
+				200*time.Millisecond,
 			)
 
 			bufSize := 1024 * 1024
@@ -444,11 +444,11 @@ func TestIsActive(t *testing.T) {
 			r.NoError(err)
 			defer ticker.Stop()
 			tc.setup(t, pinger)
-			hdl := newImpl(
+			hdl := newScalerHandler(
 				lggr,
 				pinger,
 				fakeClient,
-				123,
+				200*time.Millisecond,
 			)
 
 			res, err := hdl.IsActive(
@@ -476,16 +476,14 @@ func TestIsActive(t *testing.T) {
 func TestGetMetricSpecTable(t *testing.T) {
 	const ns = "testns"
 	type testCase struct {
-		name                string
-		defaultTargetMetric int64
-		httpso              *httpv1alpha1.HTTPScaledObject
-		checker             func(*testing.T, *externalscaler.GetMetricSpecResponse, error)
-		scalerMetadata      map[string]string
+		name           string
+		httpso         *httpv1alpha1.HTTPScaledObject
+		checker        func(*testing.T, *externalscaler.GetMetricSpecResponse, error)
+		scalerMetadata map[string]string
 	}
 	cases := []testCase{
 		{
-			name:                "valid host as single host value in scaler metadata",
-			defaultTargetMetric: 0,
+			name: "valid host as single host value in scaler metadata",
 			httpso: &httpv1alpha1.HTTPScaledObject{
 				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: validHTTPScaledObjectName},
 				Spec: httpv1alpha1.HTTPScaledObjectSpec{
@@ -508,8 +506,7 @@ func TestGetMetricSpecTable(t *testing.T) {
 			},
 		},
 		{
-			name:                "valid hosts as multiple hosts value in scaler metadata",
-			defaultTargetMetric: 0,
+			name: "valid hosts as multiple hosts value in scaler metadata",
 			httpso: &httpv1alpha1.HTTPScaledObject{
 				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: validHTTPScaledObjectName},
 				Spec: httpv1alpha1.HTTPScaledObjectSpec{
@@ -537,9 +534,8 @@ func TestGetMetricSpecTable(t *testing.T) {
 			},
 		},
 		{
-			name:                "interceptor",
-			defaultTargetMetric: 0,
-			httpso:              nil, // No httpso needed for interceptor case
+			name:   "interceptor",
+			httpso: nil, // No httpso needed for interceptor case
 			checker: func(t *testing.T, res *externalscaler.GetMetricSpecResponse, err error) {
 				t.Helper()
 				r := require.New(t)
@@ -576,7 +572,7 @@ func TestGetMetricSpecTable(t *testing.T) {
 			}
 			defer ticker.Stop()
 
-			hdl := newImpl(lggr, pinger, fakeClient, tc.defaultTargetMetric)
+			hdl := newScalerHandler(lggr, pinger, fakeClient, 200*time.Millisecond)
 			scaledObjectRef := externalscaler.ScaledObjectRef{
 				Namespace:      ns,
 				Name:           t.Name(),
@@ -600,9 +596,8 @@ func TestGetMetrics(t *testing.T) {
 			context.Context,
 			logr.Logger,
 		) (client.Reader, *queuePinger, func(), error)
-		checkFn             func(*testing.T, *externalscaler.GetMetricsResponse, error)
-		defaultTargetMetric int64
-		scalerMetadata      map[string]string
+		checkFn        func(*testing.T, *externalscaler.GetMetricsResponse, error)
+		scalerMetadata map[string]string
 	}
 
 	startFakeInterceptorServer := func(
@@ -683,7 +678,6 @@ func TestGetMetrics(t *testing.T) {
 				r.Equal(MetricName(&types.NamespacedName{Namespace: ns, Name: validHTTPScaledObjectName}), metricVal.MetricName)
 				r.Equal(int64(0), metricVal.MetricValue)
 			},
-			defaultTargetMetric: int64(200),
 			scalerMetadata: map[string]string{
 				k8s.HTTPScaledObjectKey: validHTTPScaledObjectName,
 			},
@@ -722,7 +716,6 @@ func TestGetMetrics(t *testing.T) {
 				r.Equal(MetricName(&types.NamespacedName{Namespace: ns, Name: validHTTPScaledObjectName}), metricVal.MetricName)
 				r.Equal(int64(201), metricVal.MetricValue)
 			},
-			defaultTargetMetric: int64(200),
 			scalerMetadata: map[string]string{
 				k8s.HTTPScaledObjectKey: validHTTPScaledObjectName,
 			},
@@ -764,7 +757,6 @@ func TestGetMetrics(t *testing.T) {
 				// in the setup function
 				r.Equal(int64(579), metricVal.MetricValue)
 			},
-			defaultTargetMetric: int64(500),
 			scalerMetadata: map[string]string{
 				k8s.HTTPScaledObjectKey: validHTTPScaledObjectName,
 			},
@@ -803,7 +795,6 @@ func TestGetMetrics(t *testing.T) {
 				// in the setup function
 				r.Equal(int64(6), metricVal.MetricValue)
 			},
-			defaultTargetMetric: int64(500),
 			scalerMetadata: map[string]string{
 				keyInterceptorTargetPendingRequests: "1000",
 			},
@@ -823,11 +814,11 @@ func TestGetMetrics(t *testing.T) {
 			fakeClient, pinger, cleanup, err := tc.setupFn(t, ctx, lggr)
 			r.NoError(err)
 			defer cleanup()
-			hdl := newImpl(
+			hdl := newScalerHandler(
 				lggr,
 				pinger,
 				fakeClient,
-				tc.defaultTargetMetric,
+				200*time.Millisecond,
 			)
 			res, err := hdl.GetMetrics(ctx, &externalscaler.GetMetricsRequest{
 				ScaledObjectRef: &externalscaler.ScaledObjectRef{

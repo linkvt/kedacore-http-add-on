@@ -35,7 +35,6 @@ import (
 	httpv1alpha1 "github.com/kedacore/http-add-on/operator/apis/http/v1alpha1"
 	httpcontrollers "github.com/kedacore/http-add-on/operator/controllers/http"
 	"github.com/kedacore/http-add-on/operator/controllers/http/config"
-	"github.com/kedacore/http-add-on/pkg/util"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -82,38 +81,12 @@ func main() {
 
 	externalScalerCfg, err := config.NewExternalScalerFromEnv()
 	if err != nil {
-		setupLog.Error(err, "unable to get external scaler configuration")
+		setupLog.Error(err, "unable to parse external scaler config from environment")
 		os.Exit(1)
 	}
 	baseConfig, err := config.NewBaseFromEnv()
 	if err != nil {
-		setupLog.Error(
-			err,
-			"unable to get base configuration",
-		)
-		os.Exit(1)
-	}
-
-	leaseDuration, err := util.ResolveOsEnvDuration("KEDA_HTTP_OPERATOR_LEADER_ELECTION_LEASE_DURATION")
-	if err != nil {
-		setupLog.Error(err, "invalid KEDA_HTTP_OPERATOR_LEADER_ELECTION_LEASE_DURATION")
-		os.Exit(1)
-	}
-
-	renewDeadline, err := util.ResolveOsEnvDuration("KEDA_HTTP_OPERATOR_LEADER_ELECTION_RENEW_DEADLINE")
-	if err != nil {
-		setupLog.Error(err, "invalid KEDA_HTTP_OPERATOR_LEADER_ELECTION_RENEW_DEADLINE")
-		os.Exit(1)
-	}
-
-	retryPeriod, err := util.ResolveOsEnvDuration("KEDA_HTTP_OPERATOR_LEADER_ELECTION_RETRY_PERIOD")
-	if err != nil {
-		setupLog.Error(err, "invalid KEDA_HTTP_OPERATOR_LEADER_ELECTION_RETRY_PERIOD")
-		os.Exit(1)
-	}
-
-	if err := util.ValidateLeaderElectionConfig(leaseDuration, renewDeadline, retryPeriod); err != nil {
-		setupLog.Error(err, "invalid leader election configuration")
+		setupLog.Error(err, "unable to parse operator config from environment")
 		os.Exit(1)
 	}
 
@@ -146,9 +119,9 @@ func main() {
 		LeaderElection:                enableLeaderElection,
 		LeaderElectionID:              "http-add-on.keda.sh",
 		LeaderElectionReleaseOnCancel: true,
-		LeaseDuration:                 leaseDuration,
-		RenewDeadline:                 renewDeadline,
-		RetryPeriod:                   retryPeriod,
+		LeaseDuration:                 baseConfig.LeaseDuration,
+		RenewDeadline:                 baseConfig.RenewDeadline,
+		RetryPeriod:                   baseConfig.RetryPeriod,
 		Cache: cache.Options{
 			DefaultNamespaces: namespaces,
 		},
@@ -162,8 +135,8 @@ func main() {
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 
-		ExternalScalerConfig: *externalScalerCfg,
-		BaseConfig:           *baseConfig,
+		ExternalScalerConfig: externalScalerCfg,
+		BaseConfig:           baseConfig,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HTTPScaledObject")
 		os.Exit(1)

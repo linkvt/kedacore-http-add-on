@@ -43,12 +43,10 @@ var (
 
 func main() {
 	cfg := mustParseConfig()
-	grpcPort := cfg.GRPCPort
 	namespace := cfg.TargetNamespace
 	svcName := cfg.TargetService
 	deplName := cfg.TargetDeployment
 	targetPortStr := fmt.Sprintf("%d", cfg.TargetPort)
-	targetPendingRequests := cfg.TargetPendingRequests
 	profilingAddr := cfg.ProfilingAddr
 
 	opts := zap.Options{}
@@ -131,7 +129,7 @@ func main() {
 	eg.Go(func() error {
 		setupLog.Info("starting the grpc server")
 
-		if err := startGrpcServer(ctx, cfg, ctrl.Log, grpcPort, pinger, ctrlCache, int64(targetPendingRequests)); !util.IsIgnoredErr(err) {
+		if err := startGrpcServer(ctx, cfg, ctrl.Log, pinger, ctrlCache); !util.IsIgnoredErr(err) {
 			setupLog.Error(err, "grpc server failed")
 			return err
 		}
@@ -149,8 +147,8 @@ func main() {
 	setupLog.Info("Bye!")
 }
 
-func startGrpcServer(ctx context.Context, cfg *config, lggr logr.Logger, port int, pinger *queuePinger, reader client.Reader, targetPendingRequests int64) error {
-	addr := fmt.Sprintf("0.0.0.0:%d", port)
+func startGrpcServer(ctx context.Context, cfg config, lggr logr.Logger, pinger *queuePinger, reader client.Reader) error {
+	addr := fmt.Sprintf("0.0.0.0:%d", cfg.GRPCPort)
 	lggr.Info("starting grpc server", "address", addr)
 
 	lis, err := net.Listen("tcp", addr)
@@ -190,7 +188,7 @@ func startGrpcServer(ctx context.Context, cfg *config, lggr logr.Logger, port in
 
 	grpc_health_v1.RegisterHealthServer(grpcServer, hs)
 
-	externalscaler.RegisterExternalScalerServer(grpcServer, newImpl(lggr, pinger, reader, targetPendingRequests))
+	externalscaler.RegisterExternalScalerServer(grpcServer, newScalerHandler(lggr, pinger, reader, time.Duration(cfg.StreamIntervalMS)*time.Millisecond))
 
 	go func() {
 		<-ctx.Done()

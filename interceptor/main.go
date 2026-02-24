@@ -289,7 +289,7 @@ func runAdminServer(
 func runMetricsServer(
 	ctx context.Context,
 	lggr logr.Logger,
-	metricsCfg *config.Metrics,
+	metricsCfg config.Metrics,
 ) error {
 	lggr.Info("starting the prometheus metrics server", "port", metricsCfg.OtelPrometheusExporterPort, "path", "/metrics")
 	addr := fmt.Sprintf("0.0.0.0:%d", metricsCfg.OtelPrometheusExporterPort)

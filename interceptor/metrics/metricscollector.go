@@ -15,7 +15,7 @@ type Collector interface {
 	RecordPendingRequestCount(host string, value int64)
 }
 
-func NewMetricsCollectors(metricsConfig *config.Metrics) {
+func NewMetricsCollectors(metricsConfig config.Metrics) {
 	if metricsConfig.OtelPrometheusExporterEnabled {
 		promometrics := NewPrometheusMetrics()
 		collectors = append(collectors, promometrics)

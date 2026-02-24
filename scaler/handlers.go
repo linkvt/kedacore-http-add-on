@@ -21,46 +21,34 @@ import (
 
 	httpv1alpha1 "github.com/kedacore/http-add-on/operator/apis/http/v1alpha1"
 	"github.com/kedacore/http-add-on/pkg/k8s"
-	"github.com/kedacore/http-add-on/pkg/util"
 )
 
 const (
 	keyInterceptorTargetPendingRequests = "interceptorTargetPendingRequests"
 )
 
-var streamInterval time.Duration
-
-func init() {
-	defaultMS := 200
-	timeoutMS, err := util.ResolveOsEnvInt("KEDA_HTTP_SCALER_STREAM_INTERVAL_MS", defaultMS)
-	if err != nil {
-		timeoutMS = defaultMS
-	}
-	streamInterval = time.Duration(timeoutMS) * time.Millisecond
-}
-
-type impl struct {
-	lggr         logr.Logger
-	pinger       *queuePinger
-	reader       client.Reader
-	targetMetric int64
+type scalerHandler struct {
+	lggr           logr.Logger
+	pinger         *queuePinger
+	reader         client.Reader
+	streamInterval time.Duration
 	externalscaler.UnimplementedExternalScalerServer
 }
 
-func newImpl(lggr logr.Logger, pinger *queuePinger, reader client.Reader, defaultTargetMetric int64) *impl {
-	return &impl{
-		lggr:         lggr,
-		pinger:       pinger,
-		reader:       reader,
-		targetMetric: defaultTargetMetric,
+func newScalerHandler(lggr logr.Logger, pinger *queuePinger, reader client.Reader, streamInterval time.Duration) *scalerHandler {
+	return &scalerHandler{
+		lggr:           lggr,
+		pinger:         pinger,
+		reader:         reader,
+		streamInterval: streamInterval,
 	}
 }
 
-func (e *impl) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+func (e *scalerHandler) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, nil
 }
 
-func (e *impl) IsActive(ctx context.Context, sor *externalscaler.ScaledObjectRef) (*externalscaler.IsActiveResponse, error) {
+func (e *scalerHandler) IsActive(ctx context.Context, sor *externalscaler.ScaledObjectRef) (*externalscaler.IsActiveResponse, error) {
 	lggr := e.lggr.WithName("IsActive")
 
 	gmr, err := e.GetMetrics(ctx, &externalscaler.GetMetricsRequest{
@@ -85,11 +73,11 @@ func (e *impl) IsActive(ctx context.Context, sor *externalscaler.ScaledObjectRef
 	return res, nil
 }
 
-func (e *impl) StreamIsActive(scaledObject *externalscaler.ScaledObjectRef, server externalscaler.ExternalScaler_StreamIsActiveServer) error {
+func (e *scalerHandler) StreamIsActive(scaledObject *externalscaler.ScaledObjectRef, server externalscaler.ExternalScaler_StreamIsActiveServer) error {
 	// this function communicates with KEDA via the 'server' parameter.
 	// we call server.Send (below) every streamInterval, which tells it to immediately
 	// ping our IsActive RPC
-	ticker := time.NewTicker(streamInterval)
+	ticker := time.NewTicker(e.streamInterval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -112,7 +100,7 @@ func (e *impl) StreamIsActive(scaledObject *externalscaler.ScaledObjectRef, serv
 	}
 }
 
-func (e *impl) GetMetricSpec(ctx context.Context, sor *externalscaler.ScaledObjectRef) (*externalscaler.GetMetricSpecResponse, error) {
+func (e *scalerHandler) GetMetricSpec(ctx context.Context, sor *externalscaler.ScaledObjectRef) (*externalscaler.GetMetricSpecResponse, error) {
 	lggr := e.lggr.WithName("GetMetricSpec")
 
 	scalerMetadata := sor.GetScalerMetadata()
@@ -161,7 +149,7 @@ func (e *impl) GetMetricSpec(ctx context.Context, sor *externalscaler.ScaledObje
 	return res, nil
 }
 
-func (e *impl) interceptorMetricSpec(metricName string, interceptorTargetPendingRequests string) (*externalscaler.GetMetricSpecResponse, error) {
+func (e *scalerHandler) interceptorMetricSpec(metricName string, interceptorTargetPendingRequests string) (*externalscaler.GetMetricSpecResponse, error) {
 	lggr := e.lggr.WithName("interceptorMetricSpec")
 
 	targetPendingRequests, err := strconv.ParseInt(interceptorTargetPendingRequests, 10, 64)
@@ -181,7 +169,7 @@ func (e *impl) interceptorMetricSpec(metricName string, interceptorTargetPending
 	return res, nil
 }
 
-func (e *impl) GetMetrics(ctx context.Context, metricRequest *externalscaler.GetMetricsRequest) (*externalscaler.GetMetricsResponse, error) {
+func (e *scalerHandler) GetMetrics(ctx context.Context, metricRequest *externalscaler.GetMetricsRequest) (*externalscaler.GetMetricsResponse, error) {
 	lggr := e.lggr.WithName("GetMetrics")
 	sor := metricRequest.ScaledObjectRef
 
@@ -233,7 +221,7 @@ func (e *impl) GetMetrics(ctx context.Context, metricRequest *externalscaler.Get
 	return res, nil
 }
 
-func (e *impl) interceptorMetrics(metricName string) (*externalscaler.GetMetricsResponse, error) {
+func (e *scalerHandler) interceptorMetrics(metricName string) (*externalscaler.GetMetricsResponse, error) {
 	lggr := e.lggr.WithName("interceptorMetrics")
 
 	var count int64

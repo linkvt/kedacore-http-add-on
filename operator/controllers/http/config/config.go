@@ -2,44 +2,31 @@ package config
 
 import (
 	"fmt"
-	"strconv"
+	"time"
 
-	"github.com/kelseyhightower/envconfig"
-
-	"github.com/kedacore/http-add-on/pkg/env"
+	"github.com/caarlos0/env/v11"
 )
-
-// Interceptor holds static configuration info for the interceptor
-type Interceptor struct {
-	ServiceName string `envconfig:"INTERCEPTOR_SERVICE_NAME" required:"true"`
-	ProxyPort   int32  `envconfig:"INTERCEPTOR_PROXY_PORT" required:"true"`
-	AdminPort   int32  `envconfig:"INTERCEPTOR_ADMIN_PORT" required:"true"`
-}
 
 // ExternalScaler holds static configuration info for the external scaler
 type ExternalScaler struct {
-	ServiceName string `envconfig:"EXTERNAL_SCALER_SERVICE_NAME" required:"true"`
-	Port        int32  `envconfig:"EXTERNAL_SCALER_PORT" required:"true"`
+	ServiceName string `env:"KEDAHTTP_OPERATOR_EXTERNAL_SCALER_SERVICE,required"`
+	Port        int32  `env:"KEDAHTTP_OPERATOR_EXTERNAL_SCALER_PORT" envDefault:"8091"`
 }
 
 type Base struct {
-	TargetPendingRequests int32 `envconfig:"TARGET_PENDING_REQUESTS" default:"100"`
 	// The current namespace in which the operator is running.
-	CurrentNamespace string `envconfig:"NAMESPACE" default:""`
+	CurrentNamespace string `env:"KEDA_HTTP_OPERATOR_NAMESPACE" envDefault:""`
 	// The namespace the operator should watch. Leave blank to
 	// tell the operator to watch all namespaces.
-	WatchNamespace string `envconfig:"WATCH_NAMESPACE" default:""`
+	WatchNamespace string `env:"KEDA_HTTP_OPERATOR_WATCH_NAMESPACE" envDefault:""`
+	// Leader election durations. Nil means use controller-runtime defaults.
+	LeaseDuration *time.Duration `env:"KEDA_HTTP_OPERATOR_LEADER_ELECTION_LEASE_DURATION"`
+	RenewDeadline *time.Duration `env:"KEDA_HTTP_OPERATOR_LEADER_ELECTION_RENEW_DEADLINE"`
+	RetryPeriod   *time.Duration `env:"KEDA_HTTP_OPERATOR_LEADER_ELECTION_RETRY_PERIOD"`
 }
 
-func NewBaseFromEnv() (*Base, error) {
-	ret := new(Base)
-	if err := envconfig.Process(
-		"KEDA_HTTP_OPERATOR",
-		ret,
-	); err != nil {
-		return nil, err
-	}
-	return ret, nil
+func NewBaseFromEnv() (Base, error) {
+	return env.ParseAs[Base]()
 }
 
 func (e ExternalScaler) HostName(namespace string) string {
@@ -51,42 +38,6 @@ func (e ExternalScaler) HostName(namespace string) string {
 	)
 }
 
-// AdminPortString returns i.AdminPort in string format, rather than
-// as an int32.
-func (i Interceptor) AdminPortString() string {
-	return strconv.Itoa(int(i.AdminPort))
-}
-
-// NewInterceptorFromEnv gets interceptor configuration values from environment variables and/or
-// sensible defaults if values were missing.
-// and returns the interceptor struct to match. Returns an error if required values were missing.
-func NewInterceptorFromEnv() (*Interceptor, error) {
-	serviceName, err := env.Get("KEDAHTTP_INTERCEPTOR_SERVICE")
-	if err != nil {
-		return nil, fmt.Errorf("missing 'KEDAHTTP_INTERCEPTOR_SERVICE'")
-	}
-	adminPort := env.GetInt32Or("KEDAHTTP_INTERCEPTOR_ADMIN_PORT", 8090)
-	proxyPort := env.GetInt32Or("KEDAHTTP_INTERCEPTOR_PROXY_PORT", 8091)
-
-	return &Interceptor{
-		ServiceName: serviceName,
-		AdminPort:   adminPort,
-		ProxyPort:   proxyPort,
-	}, nil
-}
-
-// NewExternalScalerFromEnv gets external scaler configuration values from environment variables and/or
-// sensible defaults if values were missing.
-// and returns the interceptor struct to match. Returns an error if required values were missing.
-func NewExternalScalerFromEnv() (*ExternalScaler, error) {
-	// image, err := env.Get("KEDAHTTP_OPERATOR_EXTERNAL_SCALER_IMAGE")
-	serviceName, err := env.Get("KEDAHTTP_OPERATOR_EXTERNAL_SCALER_SERVICE")
-	if err != nil {
-		return nil, fmt.Errorf("missing KEDAHTTP_OPERATOR_EXTERNAL_SCALER_SERVICE")
-	}
-	port := env.GetInt32Or("KEDAHTTP_OPERATOR_EXTERNAL_SCALER_PORT", 8091)
-	return &ExternalScaler{
-		ServiceName: serviceName,
-		Port:        port,
-	}, nil
+func NewExternalScalerFromEnv() (ExternalScaler, error) {
+	return env.ParseAs[ExternalScaler]()
 }
