@@ -1,5 +1,4 @@
 //go:build e2e
-// +build e2e
 
 package interceptor_otel_tracing_test
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes"
 
 	. "github.com/kedacore/http-add-on/tests/helper"
@@ -221,7 +221,7 @@ func TestTraceGeneration(t *testing.T) {
 	}, 5*time.Minute, 5*time.Second).Should(gomega.BeNumerically(">", 0), "there should be at least 1 trace")
 
 	traceStatus := getTracesStatus(traces)
-	assert.EqualValues(t, "200", traceStatus)
+	assert.Equal(t, "200", traceStatus)
 
 	// cleanup
 	DeleteKubernetesResources(t, testNamespace, data, templates)
@@ -238,7 +238,7 @@ func sendLoad(t *testing.T, kc *kubernetes.Clientset, data templateData) {
 
 func fetchAndParseZipkinTraces(t *testing.T, cmd string) Trace {
 	out, errOut, err := ExecCommandOnSpecificPod(t, clientName, testNamespace, cmd)
-	assert.NoErrorf(t, err, "cannot execute command - %s", err)
+	require.NoErrorf(t, err, "cannot execute command - %s", err)
 	assert.Empty(t, errOut, "cannot execute command - %s", errOut)
 
 	var traces Trace
