@@ -29,12 +29,8 @@ KO_RELEASE_PLATFORMS ?= linux/amd64,linux/arm64
 
 COSIGN_FLAGS ?= -y -a GIT_HASH=$(GIT_COMMIT) -a GIT_VERSION=$(VERSION) -a BUILD_DATE=$(DATE)
 
-## Location to install dependencies to
-LOCALBIN ?= $(CURDIR)/bin
-
 ## Tool Binaries
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-MOCKGEN ?= $(LOCALBIN)/mockgen
+CONTROLLER_GEN ?= go tool controller-gen
 
 define DOMAINS
 basicConstraints=CA:FALSE
@@ -124,13 +120,13 @@ e2e-test-local:
 
 generate: codegen manifests  ## Generate code and manifests.
 
-codegen: controller-gen ## Generate DeepCopy method implementations.
+codegen: ## Generate DeepCopy method implementations.
 	$(CONTROLLER_GEN) object:headerFile='hack/boilerplate.go.txt' paths='./...'
 
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	"$(CONTROLLER_GEN)" crd rbac:roleName='operator' webhook paths='./operator/...' output:crd:artifacts:config='config/crd/bases' output:rbac:artifacts:config='config/operator'
-	"$(CONTROLLER_GEN)" crd rbac:roleName='scaler' webhook paths='./scaler/...' output:rbac:artifacts:config='config/scaler'
-	"$(CONTROLLER_GEN)" crd rbac:roleName='interceptor' webhook paths='./interceptor/...' output:rbac:artifacts:config='config/interceptor'
+manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) crd rbac:roleName='operator' webhook paths='./operator/...' output:crd:artifacts:config='config/crd/bases' output:rbac:artifacts:config='config/operator'
+	$(CONTROLLER_GEN) crd rbac:roleName='scaler' webhook paths='./scaler/...' output:rbac:artifacts:config='config/scaler'
+	$(CONTROLLER_GEN) crd rbac:roleName='interceptor' webhook paths='./interceptor/...' output:rbac:artifacts:config='config/interceptor'
 
 verify-manifests: ## Verify manifests are up to date.
 	./hack/verify-manifests.sh
@@ -206,19 +202,3 @@ sign-images: ## Sign KEDA images published on GitHub Container Registry
 	cosign sign $(COSIGN_FLAGS) $(IMAGE_INTERCEPTOR_SHA_TAG)
 	cosign sign $(COSIGN_FLAGS) $(IMAGE_SCALER_VERSIONED_TAG)
 	cosign sign $(COSIGN_FLAGS) $(IMAGE_SCALER_SHA_TAG)
-
-##################################################
-# Tool dependencies                              #
-##################################################
-
-.PHONY: localbin
-localbin:
-	mkdir -p "$(LOCALBIN)"
-
-.PHONY: controller-gen
-controller-gen: localbin ## Install controller-gen if necessary.
-	test -s "$(LOCALBIN)/controller-gen" || GOBIN="$(LOCALBIN)" go install sigs.k8s.io/controller-tools/cmd/controller-gen
-
-.PHONY: mockgen
-mockgen: localbin ## Install mockgen from vendor dir if necessary.
-	test -s "$(LOCALBIN)/mockgen" || GOBIN="$(LOCALBIN)" go install go.uber.org/mock/mockgen
