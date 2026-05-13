@@ -35,7 +35,7 @@ func TestPlaceholder_BackendReady(t *testing.T) {
 	mw := NewPlaceholder(next, cache, nil)
 
 	rec := httptest.NewRecorder()
-	req := newPlaceholderRequest(t, ir)
+	req := newPlaceholderRequestWithPath(t, ir, "/")
 	mw.ServeHTTP(rec, req)
 
 	if !nextCalled {
@@ -66,7 +66,7 @@ func TestPlaceholder_BackendNotReady(t *testing.T) {
 		mw := NewPlaceholder(next, cache, nil)
 
 		rec := httptest.NewRecorder()
-		req := newPlaceholderRequest(t, ir)
+		req := newPlaceholderRequestWithPath(t, ir, "/")
 		mw.ServeHTTP(rec, req)
 
 		if !nextCalled {
@@ -94,7 +94,7 @@ func TestPlaceholder_BackendNotReady(t *testing.T) {
 		mw := NewPlaceholder(next, cache, nil)
 
 		rec := httptest.NewRecorder()
-		req := newPlaceholderRequest(t, ir)
+		req := newPlaceholderRequestWithPath(t, ir, "/")
 		mw.ServeHTTP(rec, req)
 
 		if nextCalled {
@@ -125,7 +125,7 @@ func TestPlaceholder_BackendNotReady(t *testing.T) {
 		mw := NewPlaceholder(next, cache, nil)
 
 		rec := httptest.NewRecorder()
-		req := newPlaceholderRequest(t, ir)
+		req := newPlaceholderRequestWithPath(t, ir, "/")
 		mw.ServeHTTP(rec, req)
 
 		if got, want := rec.Code, http.StatusOK; got != want {
@@ -163,7 +163,7 @@ func TestPlaceholder_BackendNotReady(t *testing.T) {
 		mw := NewPlaceholder(next, readyCache, reader)
 
 		rec := httptest.NewRecorder()
-		req := newPlaceholderRequest(t, ir)
+		req := newPlaceholderRequestWithPath(t, ir, "/")
 		mw.ServeHTTP(rec, req)
 
 		if got, want := rec.Code, http.StatusServiceUnavailable; got != want {
@@ -197,7 +197,7 @@ func TestPlaceholder_BackendNotReady(t *testing.T) {
 		mw := NewPlaceholder(next, readyCache, reader)
 
 		rec := httptest.NewRecorder()
-		req := newPlaceholderRequest(t, ir)
+		req := newPlaceholderRequestWithPath(t, ir, "/")
 		mw.ServeHTTP(rec, req)
 
 		if got, want := rec.Code, http.StatusInternalServerError; got != want {
@@ -229,13 +229,106 @@ func TestPlaceholder_BackendNotReady(t *testing.T) {
 		mw := NewPlaceholder(next, readyCache, reader)
 
 		rec := httptest.NewRecorder()
-		req := newPlaceholderRequest(t, ir)
+		req := newPlaceholderRequestWithPath(t, ir, "/")
 		mw.ServeHTTP(rec, req)
 
 		if got, want := rec.Code, http.StatusInternalServerError; got != want {
 			t.Fatalf("status code = %d, want %d", got, want)
 		}
 	})
+}
+
+func TestPlaceholder_ConfigMapPathLookup(t *testing.T) {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: "pages"},
+		Data: map[string]string{
+			"index.html": "<h1>Loading</h1>",
+			"styles.css": "body { color: red }",
+		},
+	}
+	reader := fake.NewClientBuilder().WithScheme(cache.NewScheme()).WithObjects(cm).Build()
+
+	tests := map[string]struct {
+		path            string
+		headers         map[string]string
+		wantBody        string
+		wantContentType string
+	}{
+		"RootPath": {
+			path:            "/",
+			wantBody:        "<h1>Loading</h1>",
+			wantContentType: "text/html; charset=utf-8",
+		},
+		"ExplicitFile": {
+			path:            "/styles.css",
+			wantBody:        "body { color: red }",
+			wantContentType: "text/css; charset=utf-8",
+		},
+		"KeyNotFound": {
+			path:            "/missing.js",
+			wantBody:        "",
+			wantContentType: "",
+		},
+		"ExplicitContentTypeNotOverridden": {
+			path:            "/",
+			headers:         map[string]string{"Content-Type": "text/plain"},
+			wantBody:        "<h1>Loading</h1>",
+			wantContentType: "text/plain",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			readyCache := k8s.NewReadyEndpointsCache(logr.Discard())
+
+			ir := placeholderIR(&httpv1beta1.StaticResponse{
+				StatusCode: http.StatusServiceUnavailable,
+				BodyFromConfigMap: &httpv1beta1.ConfigMapKeyRef{
+					Name: "pages",
+				},
+				Headers: tc.headers,
+			})
+
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Fatal("next handler should not be called")
+			})
+			mw := NewPlaceholder(next, readyCache, reader)
+
+			rec := httptest.NewRecorder()
+			req := newPlaceholderRequestWithPath(t, ir, tc.path)
+			mw.ServeHTTP(rec, req)
+
+			if got, want := rec.Code, http.StatusServiceUnavailable; got != want {
+				t.Fatalf("status code = %d, want %d", got, want)
+			}
+			if got := rec.Body.String(); got != tc.wantBody {
+				t.Fatalf("body = %q, want %q", got, tc.wantBody)
+			}
+			if got := rec.Header().Get("Content-Type"); got != tc.wantContentType {
+				t.Fatalf("Content-Type = %q, want %q", got, tc.wantContentType)
+			}
+		})
+	}
+}
+
+func TestConfigMapKeyFromPath(t *testing.T) {
+	tests := map[string]struct {
+		path string
+		want string
+	}{
+		"Root":       {path: "/", want: "index.html"},
+		"SingleFile": {path: "/styles.css", want: "styles.css"},
+		"NestedPath": {path: "/assets/styles.css", want: "assets/styles.css"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := configMapKeyFromPath(tc.path)
+			if got != tc.want {
+				t.Fatalf("configMapKeyFromPath(%q) = %q, want %q", tc.path, got, tc.want)
+			}
+		})
+	}
 }
 
 func placeholderIR(resp *httpv1beta1.StaticResponse) *httpv1beta1.InterceptorRoute {
@@ -252,10 +345,10 @@ func placeholderIR(resp *httpv1beta1.StaticResponse) *httpv1beta1.InterceptorRou
 	}
 }
 
-func newPlaceholderRequest(t *testing.T, ir *httpv1beta1.InterceptorRoute) *http.Request {
+func newPlaceholderRequestWithPath(t *testing.T, ir *httpv1beta1.InterceptorRoute, urlPath string) *http.Request {
 	t.Helper()
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", urlPath, nil)
 	ctx := util.ContextWithLogger(req.Context(), logr.Discard())
 	ctx = util.ContextWithInterceptorRoute(ctx, ir)
 	return req.WithContext(ctx)
